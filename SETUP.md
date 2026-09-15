@@ -1,3 +1,4 @@
+
 # Setup — ten minutes, at two moments
 
 You do **not** need everything on day one. There are exactly two setup moments in this track:
