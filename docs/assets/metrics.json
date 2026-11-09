@@ -1,0 +1,176 @@
+{
+  "rows": 30000,
+  "columns": 44,
+  "clients": 32,
+  "base_rate_overall": 0.5421,
+  "label_counts": {
+    "0": 13738,
+    "1": 16262
+  },
+  "features": 52,
+  "numeric_features": 18,
+  "categorical_source_columns": 8,
+  "train_rows": 27675,
+  "test_rows": 2325,
+  "clients_total": 32,
+  "clients_held_out": 6,
+  "train_base_rate": 0.5548,
+  "test_base_rate": 0.391,
+  "random_split": {
+    "accuracy": 0.692,
+    "precision_at_50": 0.9,
+    "roc_auc": 0.7579,
+    "avg_precision": 0.7684,
+    "test_base_rate": 0.542
+  },
+  "client_holdout": {
+    "accuracy": 0.6723,
+    "precision_at_50": 0.74,
+    "roc_auc": 0.75,
+    "avg_precision": 0.6182,
+    "test_base_rate": 0.391
+  },
+  "models_client_holdout": {
+    "dummy_majority": {
+      "accuracy": 0.391,
+      "precision_at_50": 0.46,
+      "roc_auc": 0.5,
+      "avg_precision": 0.391
+    },
+    "rule_baseline": {
+      "accuracy": 0.6095,
+      "precision_at_50": 0.46,
+      "roc_auc": 0.5011,
+      "avg_precision": 0.3919
+    },
+    "logistic_regression": {
+      "accuracy": 0.6606,
+      "precision_at_50": 0.4,
+      "roc_auc": 0.7003,
+      "avg_precision": 0.5215
+    },
+    "decision_tree": {
+      "accuracy": 0.6766,
+      "precision_at_50": 0.54,
+      "roc_auc": 0.7415,
+      "avg_precision": 0.5753
+    },
+    "random_forest": {
+      "accuracy": 0.6723,
+      "precision_at_50": 0.74,
+      "roc_auc": 0.75,
+      "avg_precision": 0.6182
+    }
+  },
+  "leakage": [
+    {
+      "feature_set": "honest (used)",
+      "accuracy": 0.6723,
+      "precision_at_50": 0.74,
+      "roc_auc": 0.75,
+      "avg_precision": 0.6182
+    },
+    {
+      "feature_set": "+ impressions_last_30d (window overlap)",
+      "accuracy": 0.729,
+      "precision_at_50": 0.94,
+      "roc_auc": 0.8427,
+      "avg_precision": 0.8025
+    },
+    {
+      "feature_set": "+ trend_pct (label-derived)",
+      "accuracy": 0.9991,
+      "precision_at_50": 1.0,
+      "roc_auc": 1.0,
+      "avg_precision": 1.0
+    }
+  ],
+  "stability_5_seeds": {
+    "seeds": [
+      42,
+      7,
+      13,
+      2024,
+      99
+    ],
+    "precision_at_50_mean": 0.832,
+    "precision_at_50_sd": 0.0867,
+    "roc_auc_mean": 0.7323,
+    "roc_auc_sd": 0.0597
+  },
+  "error_analysis": {
+    "by_content_type": [
+      {
+        "group": "keyword article",
+        "accuracy": 0.5955,
+        "n": 1367
+      },
+      {
+        "group": "feedly article",
+        "accuracy": 0.7818,
+        "n": 958
+      }
+    ],
+    "by_position_tier": [
+      {
+        "group": "page_3_5",
+        "accuracy": 0.573,
+        "n": 281
+      },
+      {
+        "group": "striking",
+        "accuracy": 0.5802,
+        "n": 405
+      },
+      {
+        "group": "page_1",
+        "accuracy": 0.6183,
+        "n": 1061
+      },
+      {
+        "group": "deep",
+        "accuracy": 0.65,
+        "n": 60
+      },
+      {
+        "group": "top_3",
+        "accuracy": 0.9112,
+        "n": 518
+      }
+    ]
+  },
+  "top_features": [
+    {
+      "feature": "days_with_impressions",
+      "importance": 0.135
+    },
+    {
+      "feature": "log_impressions_90d",
+      "importance": 0.1294
+    },
+    {
+      "feature": "avg_position",
+      "importance": 0.1092
+    },
+    {
+      "feature": "content_age_days",
+      "importance": 0.092
+    },
+    {
+      "feature": "char_count",
+      "importance": 0.0387
+    },
+    {
+      "feature": "age_tier_365+",
+      "importance": 0.0368
+    },
+    {
+      "feature": "log_clicks_90d",
+      "importance": 0.0366
+    },
+    {
+      "feature": "word_count",
+      "importance": 0.0354
+    }
+  ]
+}

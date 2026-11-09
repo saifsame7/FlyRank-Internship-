@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ranking Content Decline Risk on Unseen Clients — FlyRank ML Internship</title>
+<meta name="description" content="A leakage-audited baseline and random-forest model that ranks content decline risk for clients the model has never seen. Client-holdout precision@50 of 0.74 against a 0.39 base rate.">
+<meta name="author" content="FlyRank ML Internship">
+<meta name="theme-color" content="#0f766e">
+<link rel="canonical" href="https://saifsame7.github.io/FlyRank-Internship-/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Ranking Content Decline Risk on Unseen Clients">
+<meta property="og:description" content="A leakage-audited baseline and random-forest model for refresh triage, validated on six held-out clients.">
+<style>
+  :root{
+    --paper:#fbfaf7;
+    --card:#fffefb;
+    --ink:#1f2733;
+    --muted:#5a6472;
+    --line:#e4e1d8;
+    --accent:#0f766e;
+    --accent-ink:#0b4f4a;
+    --accent-soft:#e7f2f0;
+    --warn:#92400e;
+    --warn-soft:#fdf3e7;
+    --danger:#991b1b;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --serif:Georgia,"Iowan Old Style","Times New Roman",serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    --wrap:900px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:var(--serif);font-size:18px;line-height:1.66;
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  }
+  ::selection{background:#cfe8e4}
+  .skip{
+    position:absolute;left:-999px;top:0;background:var(--accent);color:#fff;
+    padding:.6rem 1rem;z-index:100;border-radius:0 0 8px 0;font-family:var(--sans);
+  }
+  .skip:focus{left:0}
+  a{color:var(--accent-ink);text-decoration-thickness:1px;text-underline-offset:2px}
+  a:hover{color:var(--accent)}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
+  .wrap{max-width:var(--wrap);margin:0 auto;padding:0 26px}
+
+  /* ---------- header ---------- */
+  header.masthead{padding:4.2rem 0 2.6rem;border-bottom:1px solid var(--line)}
+  .kicker{
+    font-family:var(--sans);font-size:.78rem;font-weight:700;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--accent);margin:0 0 1rem;
+  }
+  h1{
+    font-family:var(--sans);font-weight:750;letter-spacing:-.02em;
+    font-size:clamp(2.05rem,5.2vw,3.15rem);line-height:1.1;margin:0 0 1rem;max-width:20ch;
+  }
+  .standfirst{
+    font-size:1.24rem;line-height:1.55;color:#39424f;max-width:62ch;margin:0 0 1.4rem;
+  }
+  .byline{
+    font-family:var(--sans);font-size:.86rem;color:var(--muted);display:flex;
+    flex-wrap:wrap;gap:.5rem 1.2rem;margin:0;
+  }
+  .byline span{display:inline-flex;align-items:center;gap:.45rem}
+  .dot{width:5px;height:5px;border-radius:50%;background:#c3c8ce;display:inline-block}
+
+  /* ---------- sticky nav ---------- */
+  nav.toc{
+    position:sticky;top:0;z-index:50;background:rgba(251,250,247,.94);
+    border-bottom:1px solid var(--line);backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px);
+  }
+  nav.toc ul{
+    list-style:none;margin:0;padding:.55rem 26px;max-width:var(--wrap);margin:0 auto;
+    display:flex;gap:.35rem;overflow-x:auto;font-family:var(--sans);
+    font-size:.82rem;scrollbar-width:thin;
+  }
+  nav.toc a{
+    display:block;white-space:nowrap;padding:.32rem .62rem;border-radius:6px;
+    color:#46505d;text-decoration:none;
+  }
+  nav.toc a:hover{background:#efeee8;color:var(--ink)}
+
+  /* ---------- abstract ---------- */
+  section{scroll-margin-top:76px}
+  main{padding-bottom:1rem}
+  .abstract{
+    background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent);
+    border-radius:0 10px 10px 0;padding:1.5rem 1.7rem;margin:2.2rem 0 1.6rem;
+    box-shadow:0 1px 2px rgba(31,39,51,.04);
+  }
+  .abstract h2{
+    font-family:var(--sans);font-size:.78rem;font-weight:700;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--accent);margin:0 0 .7rem;
+  }
+  .abstract p{margin:0;font-size:1.06rem;line-height:1.68}
+  .abstract strong{font-weight:700}
+
+  /* ---------- KPI strip ---------- */
+  .kpis{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:0 0 2.4rem;
+  }
+  .kpi{background:var(--card);padding:1rem 1.15rem}
+  .kpi b{
+    display:block;font-family:var(--sans);font-size:1.62rem;font-weight:750;
+    letter-spacing:-.02em;line-height:1.15;color:var(--ink);
+  }
+  .kpi b small{font-size:.95rem;font-weight:600;color:var(--muted)}
+  .kpi span{display:block;font-family:var(--sans);font-size:.78rem;line-height:1.4;color:var(--muted);margin-top:.25rem}
+
+  /* ---------- prose ---------- */
+  h2.sec{
+    font-family:var(--sans);font-size:1.55rem;font-weight:730;letter-spacing:-.015em;
+    margin:3.2rem 0 .4rem;line-height:1.25;display:flex;align-items:baseline;gap:.6rem;
+  }
+  h2.sec .num{
+    font-size:.82rem;font-weight:700;color:var(--accent);letter-spacing:.06em;
+    font-variant-numeric:tabular-nums;
+  }
+  h3{font-family:var(--sans);font-size:1.12rem;font-weight:700;margin:2rem 0 .35rem;letter-spacing:-.01em}
+  p{margin:0 0 1.05rem;max-width:68ch}
+  ul,ol{max-width:68ch}
+  li{margin-bottom:.4rem}
+  .lede{font-size:1.07rem;color:#333d4a}
+  hr.rule{border:0;border-top:1px solid var(--line);margin:2.6rem 0}
+
+  /* ---------- callouts ---------- */
+  .callout{
+    background:var(--accent-soft);border-left:3px solid var(--accent);
+    padding:1rem 1.25rem;border-radius:0 8px 8px 0;margin:1.4rem 0;
+  }
+  .callout.warn{background:var(--warn-soft);border-left-color:var(--warn)}
+  .callout p:last-child{margin-bottom:0}
+  .callout .label{
+    display:block;font-family:var(--sans);font-size:.75rem;font-weight:700;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink);margin-bottom:.45rem;
+  }
+  .callout.warn .label{color:var(--warn)}
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1.4rem 0}
+  .twocol .box{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:1rem 1.15rem}
+  .twocol h4{
+    font-family:var(--sans);font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;
+    margin:0 0 .55rem;color:var(--accent-ink);
+  }
+  .twocol .box.no h4{color:var(--danger)}
+  .twocol ul{margin:0;padding-left:1.15rem;font-size:.95rem;line-height:1.5}
+
+  /* ---------- figures ---------- */
+  figure{margin:2.1rem 0 2.3rem}
+  figure a{display:block;line-height:0}
+  figure img{
+    width:100%;height:auto;display:block;background:#fff;border:1px solid var(--line);
+    border-radius:9px;box-shadow:0 1px 3px rgba(31,39,51,.05);
+  }
+  figcaption{
+    font-family:var(--sans);font-size:.87rem;line-height:1.5;color:var(--muted);
+    margin-top:.65rem;max-width:70ch;
+  }
+  figcaption strong{color:var(--ink);font-weight:700}
+  figcaption .hint{white-space:nowrap;color:var(--accent);font-weight:600;text-decoration:none}
+  figcaption .hint::after{content:" ↗"}
+
+  /* ---------- tables ---------- */
+  .table-wrap{overflow-x:auto;margin:1.4rem 0 1.9rem;border:1px solid var(--line);border-radius:9px;background:var(--card)}
+  table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:.9rem;min-width:520px}
+  caption{
+    caption-side:top;text-align:left;padding:.8rem 1rem .2rem;font-size:.82rem;
+    color:var(--muted);line-height:1.45;
+  }
+  th,td{padding:.62rem .9rem;border-bottom:1px solid #eeebe3;text-align:left;vertical-align:top}
+  thead th{font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;border-bottom:1px solid #d9d5ca}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:nth-child(even){background:#faf9f5}
+  .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  tr.best td{background:var(--accent-soft);font-weight:600}
+  tr.best td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+  td .sub{display:block;font-weight:400;color:var(--muted);font-size:.78rem}
+
+  /* ---------- recommendations ---------- */
+  .recs{list-style:none;counter-reset:rec;padding:0;margin:1.6rem 0}
+  .recs>li{
+    counter-increment:rec;position:relative;padding:1.15rem 0 1.15rem 3.1rem;
+    border-top:1px solid var(--line);
+  }
+  .recs>li:last-child{border-bottom:1px solid var(--line)}
+  .recs>li::before{
+    content:counter(rec);position:absolute;left:0;top:1.18rem;width:2rem;height:2rem;
+    border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;
+    font-family:var(--sans);font-weight:700;font-size:.92rem;
+  }
+  .recs h3{margin:.05rem 0 .35rem;font-size:1.05rem}
+  .recs p{margin:.2rem 0;max-width:64ch}
+  .recs .why{font-size:.9rem;color:var(--muted);line-height:1.55}
+  .recs .why strong{color:#3d4652}
+
+  /* ---------- code ---------- */
+  code{font-family:var(--mono);font-size:.86em;background:#efeee8;padding:.08em .32em;border-radius:4px}
+  pre{
+    background:#132220;color:#dbe9e6;border-radius:9px;padding:1.05rem 1.2rem;
+    overflow-x:auto;font-size:.84rem;line-height:1.6;margin:1.2rem 0 1.6rem;
+    border:1px solid #0c1716;
+  }
+  pre code{background:none;padding:0;color:inherit;font-size:inherit}
+  pre .c{color:#86a8a2}
+
+  /* ---------- footer ---------- */
+  footer{
+    border-top:1px solid var(--line);margin-top:3rem;padding:2rem 0 3rem;
+    font-family:var(--sans);font-size:.84rem;color:var(--muted);line-height:1.6;
+  }
+  footer p{max-width:75ch;margin:0 0 .6rem}
+  footer a{color:var(--accent-ink)}
+  .live{font-family:var(--mono);font-size:.8rem;word-break:break-all}
+
+  @media (max-width:720px){
+    body{font-size:17px}
+    .wrap{padding:0 19px}
+    header.masthead{padding:2.8rem 0 2rem}
+    .kpis{grid-template-columns:1fr 1fr}
+    .twocol{grid-template-columns:1fr}
+    .abstract{padding:1.2rem 1.25rem}
+    h2.sec{margin-top:2.6rem}
+  }
+  @media print{
+    nav.toc,.skip{display:none}
+    body{background:#fff;font-size:11pt;line-height:1.5}
+    .wrap{max-width:none;padding:0}
+    a{color:inherit;text-decoration:none}
+    figure,table,.abstract,.recs>li{break-inside:avoid}
+    h2.sec,h3{break-after:avoid}
+    .kpi{border:1px solid #ddd}
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="wrap">
+    <p class="kicker">FlyRank ML Internship · Capstone</p>
+    <h1>Ranking Content Decline Risk on Unseen Clients</h1>
+    <p class="standfirst">A leakage-audited baseline and random-forest model for refresh triage — tested on clients the model has never seen.</p>
+    <p class="byline">
+      <span>FlyRank ML Internship</span>
+      <span class="dot" aria-hidden="true"></span>
+      <span>November 2026</span>
+      <span class="dot" aria-hidden="true"></span>
+      <span>Observational study · decision support</span>
+    </p>
+  </div>
+</header>
+
+<nav class="toc" aria-label="Contents">
+  <ul>
+    <li><a href="#abstract">Abstract</a></li>
+    <li><a href="#introduction">Introduction</a></li>
+    <li><a href="#data">Data</a></li>
+    <li><a href="#method">Methodology</a></li>
+    <li><a href="#results">Results</a></li>
+    <li><a href="#limitations">Limitations</a></li>
+    <li><a href="#recommendations">Recommendations</a></li>
+    <li><a href="#reproducibility">Reproducibility</a></li>
+    <li><a href="#acknowledgments">Acknowledgments</a></li>
+  </ul>
+</nav>
+
+<main id="main">
+  <div class="wrap">
+
+    <section id="abstract" aria-labelledby="abstract-title">
+      <div class="abstract">
+        <h2 id="abstract-title">Abstract</h2>
+        <p>
+          Can a model trained on a single anonymized snapshot rank the pages most likely to be declining
+          for clients it has never seen? We use the 30,000-row, 44-column in-repo starter slice of the
+          FlyRank ML Internship dataset — 32 pseudonymized clients over a trailing 90-day window — and
+          define the label as the dataset's <code>down</code> trend bucket, then train a random forest on
+          52 features that exclude every identifier and label-derived column. On a client holdout — six
+          clients that never appear in training — the model reaches <strong>0.74 precision@50</strong>
+          against a <strong>0.39 base rate</strong> and <strong>0.75 ROC-AUC</strong>, while a transparent
+          staleness rule stays at chance (0.46 precision@50, 0.50 ROC-AUC). The same model scores
+          <strong>0.90 precision@50</strong> under a random row split, which we show is optimistic because
+          rows from one client leak across the split; adding the label-derived <code>trend_pct</code>
+          column pushes accuracy to <strong>0.999</strong>, which we report as a deliberate leakage
+          confession rather than a result. We conclude that tree-based ranking is useful
+          <strong>decision support for refresh triage</strong> — not a causal claim — and we publish the
+          code, seeds, and figures needed to reproduce every number.
+        </p>
+      </div>
+
+      <div class="kpis" role="list" aria-label="Key results at a glance">
+        <div class="kpi" role="listitem">
+          <b>0.74 <small>vs 0.39</small></b>
+          <span>Precision@50 on six held-out clients vs the holdout base rate</span>
+        </div>
+        <div class="kpi" role="listitem">
+          <b>0.75</b>
+          <span>ROC-AUC on the same client holdout</span>
+        </div>
+        <div class="kpi" role="listitem">
+          <b>0.90 <small>→ 0.74</small></b>
+          <span>Precision@50 drop when moving from a random split to a client holdout</span>
+        </div>
+        <div class="kpi" role="listitem">
+          <b>0.999</b>
+          <span>Accuracy once <code>trend_pct</code> leaks in — a red flag, not a win</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="introduction" aria-labelledby="intro-title">
+      <h2 class="sec" id="intro-title"><span class="num">01</span> Introduction</h2>
+      <p class="lede">
+        Content teams cannot refresh everything. The operational question is not “is this page declining?”
+        but “which pages should we look at first, given a fixed review budget?” This paper studies that
+        ranking problem in the decline-risk / refresh-priority lane.
+      </p>
+      <p>
+        A ranking model is only useful if it holds up on clients it has not memorized. Most quick
+        evaluations split rows at random, which lets pages from the same client appear in both training
+        and test. That is an optimistic test: a model can learn a client's idiosyncrasies and appear to
+        generalize. We therefore treat the <em>client split</em> as the honest test and report the random
+        split only as a contrast.
+      </p>
+      <p>
+        The paper makes four contributions, each tied to a notebook in the repository:
+      </p>
+      <ul>
+        <li><strong>A contract-first dataset audit.</strong> Field meanings, leakage risks, and the exact
+          label derivation are fixed before any model is trained.</li>
+        <li><strong>A transparent baseline vs a learned ranker.</strong> A three-signal staleness rule is
+          compared with logistic regression, a shallow decision tree, and a random forest on the same
+          client holdout.</li>
+        <li><strong>An explicit leakage confession.</strong> We add two tempting columns one at a time to
+          show how accuracy inflates to 0.999, so future iterations know what not to do.</li>
+        <li><strong>A ranked action playbook.</strong> The output is a review queue and a set of guardrails,
+          not an automated refresh decision.</li>
+      </ul>
+      <div class="twocol">
+        <div class="box">
+          <h4>What this evidence supports</h4>
+          <ul>
+            <li>Ranking pages by modeled decline risk for <em>unseen clients</em> beats a base-rate queue.</li>
+            <li>Tree-based models add real ordering signal over a hand rule (AUC 0.75 vs 0.50).</li>
+            <li>Reviewing the top of the queue first is a reasonable use of a limited budget.</li>
+          </ul>
+        </div>
+        <div class="box no">
+          <h4>What it does not support</h4>
+          <ul>
+            <li>That refreshing a page <em>causes</em> recovery.</li>
+            <li>That a score is a calibrated probability of future decline.</li>
+            <li>That one snapshot generalizes to every client or season.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="data" aria-label="Data">
+      <h2 class="sec"><span class="num">02</span> Data</h2>
+      <p>
+        This study uses the anonymized starter slice shipped with the internship repository
+        (<code>data/raw/content_refresh_anonymized.csv</code>), not the gated warehouse release. It is
+        public-safe and reproducible from a clone. The slice is a single snapshot whose traffic metrics
+        cover a trailing 90-day window, with explicit 30-day and previous-30-day columns for trend work.
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <caption><strong>Table 1.</strong> Dataset at a glance. The positive rate is the share of rows in the <code>down</code> bucket.</caption>
+          <thead>
+            <tr><th scope="col">Quantity</th><th scope="col" class="num">Value</th><th scope="col">Note</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Rows</td><td class="num">30,000</td><td>One row per content page</td></tr>
+            <tr><td>Raw columns</td><td class="num">44</td><td>Traffic, metadata, tiers, trend flags</td></tr>
+            <tr><td>Pseudonymized clients</td><td class="num">32</td><td>Grouping key only; never a feature</td></tr>
+            <tr><td>Positive rate</td><td class="num">54.2%</td><td>16,262 of 30,000 rows</td></tr>
+            <tr><td>Model features</td><td class="num">52</td><td>18 numeric + 8 categorical, one-hot</td></tr>
+            <tr><td>Client-holdout test rows</td><td class="num">2,325</td><td>Six clients held out entirely</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Label definition</h3>
+      <p>
+        The dataset does not ship a pre-computed target. We derive one from the trend bucket:
+      </p>
+      <pre><code>is_declining_label = 1 if trend_direction == "down" else 0</code></pre>
+      <p>
+        <code>trend_direction</code> compares the last 30 days of impressions with the previous 30 days.
+        The label is therefore <em>rule-derived</em>, not an observed future outcome. That distinction is
+        the backbone of the limitations below.
+      </p>
+
+      <h3>Field quality notes that shaped the pipeline</h3>
+      <ul>
+        <li><strong>Rates are percentages ×100.</strong> <code>ctr = 0.76</code> means 0.76%, not a 0.76
+          fraction. We never mix these with 0–1 probabilities.</li>
+        <li><strong><code>avg_position = 0</code> means “no data.”</strong> The honest pipeline fills numeric
+          gaps with zero, which conflates missing position with rank zero; we flag this as a limitation
+          rather than hide it.</li>
+        <li><strong>Some rates can exceed 100%.</strong> <code>scroll_rate</code> and
+          <code>ai_traffic_pct</code> can go above 100 because of multi-page sessions; they are not clipped.</li>
+        <li><strong>Missingness is structured.</strong> For example, <code>search_volume</code> is missing for
+          one article type, so “zero search volume” often means “not measured.” Tree models tolerate this
+          better than linear ones.</li>
+      </ul>
+
+      <h3>Privacy and scope</h3>
+      <p>
+        Client identifiers are pseudonyms used only for grouping. No client names, URLs, private queries,
+        or raw exports appear in this paper or in the deployed page. The raw dataset is not republished;
+        only aggregate metrics and derived charts are shown. See the repository's
+        <a href="https://github.com/saifsame7/FlyRank-Internship-/blob/main/DATA_USE.md">data-use notes</a>.
+      </p>
+    </section>
+
+    <section id="method" aria-labelledby="method-title">
+      <h2 class="sec" id="method-title"><span class="num">03</span> Methodology</h2>
+
+      <h3>Assumptions</h3>
+      <ol>
+        <li><strong>Single snapshot.</strong> We treat the export as one cross-section; there is no time-aware
+          test and no post-refresh outcome.</li>
+        <li><strong>The label is a rule.</strong> It captures the dataset's own definition of decline, not an
+          independent measurement.</li>
+        <li><strong>Clients are the unit of generalization.</strong> A page from a client seen in training is
+          not an honest test of a new client.</li>
+        <li><strong>Ranking beats probability.</strong> We optimize ordering for a review queue, not
+          calibration of absolute risk.</li>
+        <li><strong>No causal claim.</strong> Nothing here estimates the effect of refreshing content.</li>
+      </ol>
+
+      <h3>Features</h3>
+      <p>
+        The honest feature set has 18 numeric columns and 8 categorical columns, giving 52 columns after
+        one-hot encoding. Heavy-tailed traffic counts are transformed with <code>log1p</code>. Numeric gaps
+        are coerced to zero; categorical gaps become <code>unknown</code>. The following are forbidden as
+        features, and the pipeline asserts they never enter the matrix:
+      </p>
+      <ul>
+        <li><code>trend_direction</code> and <code>trend_pct</code> — both derived from the label.</li>
+        <li><code>is_declining_label</code> — the target itself.</li>
+        <li><code>content_id</code> and <code>client_id</code> — identifiers, grouping only.</li>
+        <li>All <code>*_last_30d</code> columns — they overlap the label window and inflate scores.</li>
+      </ul>
+
+      <h3>Models compared</h3>
+      <ul>
+        <li><strong>All-positive baseline</strong> — predict the positive class for everyone; a floor.</li>
+        <li><strong>Transparent rule</strong> — stale (≥90 days since update) × visible (previous-30-day
+          impressions above the median) × previous-30-day impressions. No learning.</li>
+        <li><strong>Logistic regression</strong> — standardized inputs, balanced class weights.</li>
+        <li><strong>Decision tree</strong> — depth 5, minimum 50 rows per leaf, balanced weights.</li>
+        <li><strong>Random forest</strong> — 200 trees, depth 10, minimum 25 rows per leaf,
+          <code>balanced_subsample</code> weights.</li>
+      </ul>
+
+      <h3>Validation design</h3>
+      <p>
+        The primary test is a <strong>client holdout</strong>: a seeded 20% sample of clients (six of 32) is
+        removed entirely, leaving 27,675 training rows and 2,325 test rows with zero client overlap. For
+        contrast, we also run a stratified random row split of the same data. We report accuracy,
+        precision@50, ROC-AUC, and average precision. Precision@50 is the operational metric — of the 50
+        pages ranked highest, what share are truly declining? — but it is noisy at <em>n</em> = 50, so AUC
+        and average precision carry the stability argument. To quantify split sensitivity, the client
+        holdout is repeated across five seeds (42, 7, 13, 2024, 99) with a fresh model each time.
+      </p>
+
+      <h3>Leakage protocol</h3>
+      <p>
+        Before modeling we run an add-one-column audit. Starting from the honest features, we add
+        <code>impressions_last_30d</code> (window overlap) and then <code>trend_pct</code>
+        (label-derived) separately, and re-score on the same holdout. A large jump is treated as evidence
+        of leakage, not as a modeling improvement.
+      </p>
+    </section>
+
+    <section id="results" aria-labelledby="results-title">
+      <h2 class="sec" id="results-title"><span class="num">04</span> Results</h2>
+
+      <h3>The learned ranker beats the baselines on unseen clients</h3>
+      <div class="table-wrap">
+        <table>
+          <caption><strong>Table 2.</strong> Client-holdout performance (2,325 rows, base rate 0.391). The highlighted random forest leads on precision@50, ROC-AUC, and average precision. Precision@50 is computed at <em>k</em> = 50.</caption>
+          <thead>
+            <tr><th scope="col">Model</th><th scope="col" class="num">Accuracy</th><th scope="col" class="num">Precision@50</th><th scope="col" class="num">ROC-AUC</th><th scope="col" class="num">Avg. precision</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>All-positive baseline</td><td class="num">0.391</td><td class="num">0.46</td><td class="num">0.500</td><td class="num">0.391</td></tr>
+            <tr><td>Transparent rule</td><td class="num">0.610</td><td class="num">0.46</td><td class="num">0.501</td><td class="num">0.392</td></tr>
+            <tr><td>Logistic regression</td><td class="num">0.661</td><td class="num">0.40</td><td class="num">0.700</td><td class="num">0.522</td></tr>
+            <tr><td>Decision tree</td><td class="num">0.677</td><td class="num">0.54</td><td class="num">0.742</td><td class="num">0.575</td></tr>
+            <tr class="best"><td>Random forest</td><td class="num">0.672</td><td class="num">0.74</td><td class="num">0.750</td><td class="num">0.618</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        The random forest ranks best: 0.74 precision@50 against a 0.39 base rate, with 0.75 ROC-AUC and
+        0.62 average precision. The two baselines sit at ROC-AUC ≈ 0.50 — they concentrate a few positives
+        by luck, but carry no ordering signal. Logistic regression shows the value of AUC over a single
+        top-50 cut: it orders reasonably (AUC 0.70) yet its balanced-weight threshold puts few positives in
+        the top 50 (0.40 precision@50). At <em>n</em> = 50, precision@50 is a noisy operational probe, not a
+        stable model ranking.
+      </p>
+
+      <figure>
+        <a href="assets/fig_model_vs_baseline.png" target="_blank" rel="noopener">
+          <img src="assets/fig_model_vs_baseline.png" width="1616" height="912" decoding="async"
+               alt="Horizontal bar chart of precision at 50 on the client holdout. All-positive baseline 0.46, transparent rule 0.46, logistic regression 0.40, decision tree 0.54, random forest 0.74. A dashed vertical line marks the 0.39 held-out base rate.">
+        </a>
+        <figcaption><strong>Figure 1.</strong> Precision@50 on six held-out clients. Only the random forest
+          clears the 0.39 base rate decisively; the rule and all-positive baselines are indistinguishable.
+          <a class="hint" href="assets/fig_model_vs_baseline.png" target="_blank" rel="noopener">Open full size</a></figcaption>
+      </figure>
+
+      <h3>A random split flatters the same model</h3>
+      <div class="table-wrap">
+        <table>
+          <caption><strong>Table 3.</strong> Same model, two validation schemes. The random row split shares clients between train and test; the client holdout does not.</caption>
+          <thead>
+            <tr><th scope="col">Split</th><th scope="col" class="num">Test base rate</th><th scope="col" class="num">Precision@50</th><th scope="col" class="num">ROC-AUC</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Random row split <span class="sub">clients leak across the split</span></td><td class="num">0.542</td><td class="num">0.90</td><td class="num">0.758</td></tr>
+            <tr><td>Client holdout <span class="sub">no client overlap</span></td><td class="num">0.391</td><td class="num">0.74</td><td class="num">0.750</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <figure>
+        <a href="assets/fig_before_after.png" target="_blank" rel="noopener">
+          <img src="assets/fig_before_after.png" width="1476" height="872" decoding="async"
+               alt="Grouped bar chart comparing a random row split and a client holdout. Precision at 50 falls from 0.90 to 0.74; ROC-AUC is essentially flat at 0.76 versus 0.75.">
+        </a>
+        <figcaption><strong>Figure 2.</strong> The honest split cuts precision@50 from 0.90 to 0.74 while
+          ROC-AUC barely moves (0.76 → 0.75). The ranking signal is real; the top-of-queue hit rate was
+          partly memorized client context. <a class="hint" href="assets/fig_before_after.png" target="_blank" rel="noopener">Open full size</a></figcaption>
+      </figure>
+
+      <p>
+        The drop is the point. A model that looked near-perfect on a random split lands at a useful but
+        modest 0.74 on new clients. Across five reseeded client splits the random forest averages
+        <strong>0.83 ± 0.09 precision@50</strong> and <strong>0.73 ± 0.06 ROC-AUC</strong>; the fixed
+        seed-42 split is a conservative draw. The correct takeaway is a range, not a single decimal.
+      </p>
+
+      <h3>Where the model still struggles</h3>
+      <p>
+        On the fixed holdout, accuracy is 0.596 for keyword articles (<em>n</em> = 1,367) versus 0.782 for
+        feedly articles (<em>n</em> = 958). By position, it is strongest at the top — 0.911 for top-3
+        rankings (<em>n</em> = 518) — and weakest exactly where refresh decisions are most tempting:
+        0.580 for striking-distance pages and 0.573 for page 3–5. In other words, the model is most
+        reliable where visibility is dense and least reliable in the ambiguous middle of the results page.
+        That is a reason to review those pages by hand, not to trust a score there.
+      </p>
+
+      <h3>Leakage, confessed</h3>
+      <figure>
+        <a href="assets/fig_leakage.png" target="_blank" rel="noopener">
+          <img src="assets/fig_leakage.png" width="1476" height="881" decoding="async"
+               alt="Bar chart of test accuracy. Honest feature set 0.672; adding the overlapping last-30-day impressions raises it to 0.729; adding the label-derived trend percent raises it to 0.999. An annotation calls 0.999 a red flag, not progress.">
+        </a>
+        <figcaption><strong>Figure 3.</strong> Adding one overlapping column lifts accuracy to 0.729;
+          adding the label-derived <code>trend_pct</code> lifts it to 0.999. The second jump is leakage, not
+          skill. <a class="hint" href="assets/fig_leakage.png" target="_blank" rel="noopener">Open full size</a></figcaption>
+      </figure>
+
+      <div class="callout warn">
+        <span class="label">Read this as a warning</span>
+        <p>
+          <code>trend_pct</code> is the variable the label is built from. A model that sees it can
+          reconstruct the answer, so 0.999 accuracy is the signature of a broken experiment. We keep the
+          test in the paper so the next iteration recognizes it immediately. The honest number remains
+          <strong>0.74 precision@50</strong>.
+        </p>
+      </div>
+
+      <h3>What the model leans on</h3>
+      <figure>
+        <a href="assets/fig_feature_importance.png" target="_blank" rel="noopener">
+          <img src="assets/fig_feature_importance.png" width="1867" height="943" decoding="async"
+               alt="Horizontal bar chart of random-forest feature importance. Days with impressions 0.135, log impressions over 90 days 0.129, average position 0.109, content age 0.092, then character count, age tier 365 plus, log clicks, and word count around 0.035 to 0.039.">
+        </a>
+        <figcaption><strong>Figure 4.</strong> The forest relies on how consistently a page is seen, how
+          much traffic it gets, where it ranks, and how old it is — not on word count or CTR alone.
+          <a class="hint" href="assets/fig_feature_importance.png" target="_blank" rel="noopener">Open full size</a></figcaption>
+      </figure>
+
+      <p>
+        Consistency of visibility (<code>days_with_impressions</code>, 0.135), total impressions (0.129),
+        average position (0.109), and content age (0.092) dominate. The signal is a
+        “consistently seen, aging, mid-ranked” pattern rather than a writing-style effect. That is
+        consistent with the dataset's structure, and it is also a caution: these are the same variables a
+        human reviewer would notice, so the model's edge is in combining them at scale, not in discovering
+        an exotic cue.
+      </p>
+    </section>
+
+    <section id="limitations" aria-labelledby="limitations-title">
+      <h2 class="sec" id="limitations-title"><span class="num">05</span> Limitations</h2>
+      <ul>
+        <li><strong>The label is rule-derived.</strong> <code>is_declining_label</code> reproduces the
+          dataset's down bucket; it is not an independently observed future decline. All results inherit
+          that definition.</li>
+        <li><strong>One snapshot, no time-aware test.</strong> We cannot measure what happens after a
+          refresh, so no causal or forward-looking claim is supported.</li>
+        <li><strong>Small and heterogeneous client base.</strong> Thirty-two clients, six held out, and a
+          holdout base rate of 0.391 versus 0.542 overall. Client difficulty varies, which is why the
+          five-seed precision@50 has a standard deviation of 0.09.</li>
+        <li><strong>Window overlap in the inputs.</strong> The 90-day totals include the 30-day label
+          window. This likely makes the honest scores somewhat optimistic in degree, though not in
+          direction. We do not claim an unbiased estimate.</li>
+        <li><strong>Missing-value handling is crude.</strong> Numeric gaps become zero, so missing
+          <code>avg_position</code> is read as position zero. Structured missingness (for example,
+          <code>search_volume</code> for one article type) can therefore carry content-type information.</li>
+        <li><strong>Precision@50 is unstable.</strong> At <em>n</em> = 50 a single reordering moves the
+          number. AUC and average precision are the more stable comparisons; the queue metric is the
+          operational one.</li>
+        <li><strong>No query, competitor, backlink, or SERP context.</strong> The snapshot lacks the
+          demand-side and competitive signals a real refresh decision would use.</li>
+        <li><strong>Privacy limits richness.</strong> Pseudonymization and the public-slice constraint keep
+          some useful fields out of scope.</li>
+      </ul>
+
+      <div class="callout">
+        <span class="label">Claim ladder</span>
+        <p>
+          Observed → directional → decision support. The evidence supports the first two and a cautious
+          version of the third. It does not support “this model predicts which content will recover.”
+        </p>
+      </div>
+    </section>
+
+    <section id="recommendations" aria-labelledby="recs-title">
+      <h2 class="sec" id="recs-title"><span class="num">06</span> Ranked recommendations</h2>
+      <p class="lede">Ordered by expected value per unit of reviewer time, with the evidence behind each step.</p>
+
+      <ol class="recs">
+        <li>
+          <h3>Use the model to sort the queue, not to make the call</h3>
+          <p>Send the highest-scoring pages to a human reviewer first. Treat the score as a prioritization
+            aid, not an instruction to edit or delete.</p>
+          <p class="why"><strong>Why:</strong> 0.74 precision@50 on unseen clients means roughly three in
+            four top-50 pages are truly declining — useful for triage, far from certain.</p>
+        </li>
+        <li>
+          <h3>Compare any tool on a client holdout, never a random row split</h3>
+          <p>Make “no client appears in both train and test” a release gate. Report the seed spread, not a
+            single lucky split.</p>
+          <p class="why"><strong>Why:</strong> the same model scored 0.90 precision@50 on a random split and
+            0.74 on a client holdout; the 0.90 was memorization.</p>
+        </li>
+        <li>
+          <h3>Start reviews where the model is strongest: consistently seen, aging, mid-ranked pages</h3>
+          <p>Prioritize pages with many days with impressions, weak 90-day visibility, page-3-to-5
+            positions, and older content age — the variables the forest actually uses.</p>
+          <p class="why"><strong>Why:</strong> days with impressions (0.135), impressions (0.129), average
+            position (0.109), and content age (0.092) dominate feature importance.</p>
+        </li>
+        <li>
+          <h3>Hand-review keyword-heavy and striking-distance pages</h3>
+          <p>Do not auto-act on the ambiguous middle. Route keyword articles and striking-distance pages to
+            an editor who can read intent and context.</p>
+          <p class="why"><strong>Why:</strong> accuracy is 0.596 for keyword articles and 0.580 for
+            striking-distance pages, versus 0.911 for top-3 pages.</p>
+        </li>
+        <li>
+          <h3>Lock the feature contract in code</h3>
+          <p>Block <code>trend_direction</code>, <code>trend_pct</code>, <code>*_last_30d</code>,
+            <code>content_id</code>, and <code>client_id</code> with an automated assertion in the training
+            pipeline.</p>
+          <p class="why"><strong>Why:</strong> one leaked column took accuracy from 0.672 to 0.999. The
+            guardrail is cheaper than the cleanup.</p>
+        </li>
+        <li>
+          <h3>Measure post-refresh outcomes and feed them back</h3>
+          <p>Record what was refreshed, when, and what happened. Replace the rule-derived label with an
+            observed outcome before making stronger claims.</p>
+          <p class="why"><strong>Why:</strong> this study has no forward outcome; that is the single
+            biggest upgrade available.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section id="reproducibility" aria-labelledby="repro-title">
+      <h2 class="sec" id="repro-title"><span class="num">07</span> Reproducibility</h2>
+      <p>
+        Every number and figure in this paper is regenerated by one script from the committed starter CSV.
+        The notebooks are the audit trail; the script is the build.
+      </p>
+
+      <pre><code><span class="c"># from the repository root</span>
+pip install -r requirements.txt
+python scripts/build_paper_assets.py      <span class="c"># writes docs/assets/*.png + metrics.json</span></code></pre>
+
+      <div class="table-wrap">
+        <table>
+          <caption><strong>Table 4.</strong> Where each claim comes from.</caption>
+          <thead>
+            <tr><th scope="col">Path</th><th scope="col">What it establishes</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>work/notebooks/w03_data_contract.ipynb</code></td><td>Field contract, windows, and assumptions</td></tr>
+            <tr><td><code>work/notebooks/w03_feature_leakage_check.ipynb</code></td><td>Forbidden columns and the exclusion check</td></tr>
+            <tr><td><code>work/notebooks/w04_baseline_score.ipynb</code></td><td>Transparent rule and the action-score queue</td></tr>
+            <tr><td><code>work/notebooks/w04_signal_audit.ipynb</code></td><td>Three signal tests with verdicts</td></tr>
+            <tr><td><code>work/notebooks/w05_model.ipynb</code></td><td>Model comparison, importance, and error analysis</td></tr>
+            <tr><td><code>work/notebooks/w06_validation_audit.ipynb</code></td><td>Before/after split and leakage confessions</td></tr>
+            <tr><td><code>scripts/build_paper_assets.py</code></td><td>Regenerates every figure and <code>docs/assets/metrics.json</code></td></tr>
+            <tr><td><code>docs/assets/metrics.json</code></td><td>Machine-readable copy of all reported numbers</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Environment.</strong> Python 3.11.6, pandas 3.0.0, NumPy 1.26.4, scikit-learn 1.8.0,
+        Matplotlib 3.10.8. The random forest uses a fixed <code>random_state</code> and is deterministic;
+        the stability check re-runs both the client split and the model across five seeds. Data file:
+        <code>data/raw/content_refresh_anonymized.csv</code> (committed, anonymized).</p>
+
+      <p><strong>Metric definitions.</strong> Precision@50 = share of the top 50 scored rows whose label is
+        1. ROC-AUC = probability a random positive outranks a random negative. Average precision =
+        area under the precision–recall curve. All are computed on the client holdout unless labelled
+        otherwise.</p>
+    </section>
+
+    <section id="acknowledgments" aria-labelledby="ack-title">
+      <h2 class="sec" id="ack-title"><span class="num">08</span> Acknowledgments</h2>
+      <p>
+        Built on the <a href="https://flyrank.ai">FlyRank ML Internship dataset</a>. The dataset is
+        anonymized: clients are pseudonyms, and no client names, URLs, or private queries appear here.
+        Thanks to the FlyRank team for the data and the review prompts, and to the internship reviewers
+        whose feedback shaped the leakage and validation sections.
+      </p>
+    </section>
+
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><strong>Ranking Content Decline Risk on Unseen Clients.</strong> FlyRank ML Internship capstone,
+      November 2026. Observational study; results are decision support, not causal evidence.</p>
+    <p>Code and notebooks:
+      <a href="https://github.com/saifsame7/FlyRank-Internship-">github.com/saifsame7/FlyRank-Internship-</a>.
+      Data credit: <a href="https://flyrank.ai">flyrank.ai</a>.</p>
+    <p class="live">Live at https://saifsame7.github.io/FlyRank-Internship-/</p>
+  </div>
+</footer>
+
+</body>
+</html>
